@@ -2,6 +2,8 @@ package com.ivangames.voxelgrit
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -14,6 +16,8 @@ import kotlin.math.abs
 class MapView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
+
+    private var mapBitmap: Bitmap? = null
 
     private var scaleFactor = 1f
     private var offsetX = 0f
@@ -44,77 +48,51 @@ class MapView @JvmOverloads constructor(
         }
     }
 
-    // Кисти
-    private val waterPaint = Paint().apply { color = Color.parseColor("#1A237E") }
-    private val landPaint = Paint().apply { color = Color.parseColor("#D2B48C") }
-    // Кисть для точек больше не нужна
-
-    private val pixelSize = 20f
-    private val mapGrid = arrayOf(
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000011100000000000000000000000000000000",
-        "0001111110000000000000000000001111000000",
-        "0011111111100000000000000000111111110000",
-        "0001111111111000000000000001111111111000",
-        "0000111111110000000000000001111111110000",
-        "0000011111110000000000000000111111100000",
-        "0000001111100000000000000000011111000000",
-        "0000000110000000000000000000001110000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000011000000000000000000000",
-        "0000000000000001111000000000000000000000",
-        "0000000000000011111000000000000000000000",
-        "0000000000000011110000000000000000000000",
-        "0000000000000001100000000000000000000000",
-        "0000000000000001000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000"
-    )
+    // Кисть для отрисовки (не нужна, если нет фона, но оставим)
+    private val paint = Paint().apply { isAntiAlias = true }
 
     init {
         scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 scaleFactor *= detector.scaleFactor
                 scaleFactor = scaleFactor.coerceIn(0.5f, 5.0f)
-                targetScale = scaleFactor // Синхронизируем цель
+                targetScale = scaleFactor
                 invalidate()
                 return true
             }
         })
+        loadMap()
+    }
+
+    private fun loadMap() {
+        try {
+            // Загружаем картинку map.jpg из drawable
+            val resId = resources.getIdentifier("map", "drawable", context.packageName)
+            if (resId != 0) {
+                mapBitmap = BitmapFactory.decodeResource(resources, resId)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawColor(Color.parseColor("#1A237E"))
+        
+        // Фон (на случай если карта не прогрузится)
+        canvas.drawColor(Color.parseColor("#87CEEB")) // Небесно-голубой
 
         canvas.save()
         canvas.scale(scaleFactor, scaleFactor, width / 2f, height / 2f)
         canvas.translate(offsetX, offsetY)
 
-        val mapWidth = mapGrid[0].length * pixelSize
-        val mapHeight = mapGrid.size * pixelSize
-        val startX = (width - mapWidth) / 2f
-        val startY = (height - mapHeight) / 2f
-
-        // Рисуем только материки
-        for (y in mapGrid.indices) {
-            for (x in mapGrid[y].indices) {
-                if (mapGrid[y][x] == '1') {
-                    val left = startX + x * pixelSize
-                    val top = startY + y * pixelSize
-                    canvas.drawRect(left, top, left + pixelSize, top + pixelSize, landPaint)
-                }
-            }
+        // Рисуем картинку по центру
+        mapBitmap?.let { bitmap ->
+            val left = (width - bitmap.width) / 2f
+            val top = (height - bitmap.height) / 2f
+            canvas.drawBitmap(bitmap, left, top, paint)
         }
-        // Цикл отрисовки точек удален
-        
+
         canvas.restore()
     }
 
