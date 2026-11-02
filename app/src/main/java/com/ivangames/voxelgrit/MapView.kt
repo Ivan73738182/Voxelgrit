@@ -47,12 +47,7 @@ class MapView @JvmOverloads constructor(
     // Кисти
     private val waterPaint = Paint().apply { color = Color.parseColor("#1A237E") }
     private val landPaint = Paint().apply { color = Color.parseColor("#D2B48C") }
-    // Убрали gridPaint (сетку)
-    private val dotPaint = Paint().apply {
-        color = Color.WHITE
-        style = Paint.Style.FILL
-        isAntiAlias = true
-    }
+    // Кисть для точек больше не нужна
 
     private val pixelSize = 20f
     private val mapGrid = arrayOf(
@@ -108,7 +103,7 @@ class MapView @JvmOverloads constructor(
         val startX = (width - mapWidth) / 2f
         val startY = (height - mapHeight) / 2f
 
-        // Рисуем материки без сетки
+        // Рисуем только материки
         for (y in mapGrid.indices) {
             for (x in mapGrid[y].indices) {
                 if (mapGrid[y][x] == '1') {
@@ -118,17 +113,8 @@ class MapView @JvmOverloads constructor(
                 }
             }
         }
-
-        // Рисуем точки
-        for (y in mapGrid.indices) {
-            for (x in mapGrid[y].indices) {
-                if (mapGrid[y][x] == '1' && (x + y) % 2 == 0) {
-                    val cx = startX + x * pixelSize + pixelSize / 2f
-                    val cy = startY + y * pixelSize + pixelSize / 2f
-                    canvas.drawCircle(cx, cy, 3f / scaleFactor, dotPaint)
-                }
-            }
-        }
+        // Цикл отрисовки точек удален
+        
         canvas.restore()
     }
 
