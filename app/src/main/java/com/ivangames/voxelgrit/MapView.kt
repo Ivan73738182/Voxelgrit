@@ -2,8 +2,6 @@ package com.ivangames.voxelgrit
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -16,7 +14,6 @@ class MapView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private var mapBitmap: Bitmap? = null
     private var scaleFactor = 1f
     private var offsetX = 0f
     private var offsetY = 0f
@@ -26,23 +23,53 @@ class MapView @JvmOverloads constructor(
     private var isDragging = false
     private var scaleDetector: ScaleGestureDetector
 
+    // Кисти для рисования
+    private val waterPaint = Paint().apply { color = Color.parseColor("#1A237E") } // Тёмно-синий океан
+    private val landPaint = Paint().apply { color = Color.parseColor("#D2B48C") }  // Песочный цвет земли
+    private val gridPaint = Paint().apply {
+        color = Color.parseColor("#000000")
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+        alpha = 50
+    }
     private val dotPaint = Paint().apply {
         color = Color.WHITE
         style = Paint.Style.FILL
         isAntiAlias = true
     }
-    private val dotOutlinePaint = Paint().apply {
-        color = Color.BLACK
-        style = Paint.Style.STROKE
-        strokeWidth = 2f
-        isAntiAlias = true
-    }
 
-    private val testDots = listOf(
-        floatArrayOf(300f, 200f),
-        floatArrayOf(800f, 250f),
-        floatArrayOf(1000f, 300f),
-        floatArrayOf(900f, 500f)
+    // Размер одного "пикселя" карты (чем больше, тем крупнее пиксель-арт)
+    private val pixelSize = 20f 
+    
+    // Сетка карты (1 = земля, 0 = вода)
+    // Я вручную набросал упрощённые контуры материков (Европа, Африка, Америка и т.д.)
+    // Ширина сетки: 40 клеток, Высота: 25 клеток
+    private val mapGrid = arrayOf(
+        "0000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000",
+        "0000011100000000000000000000000000000000", // Северная Америка
+        "0001111110000000000000000000001111000000",
+        "0011111111100000000000000000111111110000",
+        "0001111111111000000000000001111111111000",
+        "0000111111110000000000000001111111110000",
+        "0000011111110000000000000000111111100000",
+        "0000001111100000000000000000011111000000",
+        "0000000110000000000000000000001110000000",
+        "0000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000", // Южная Америка
+        "0000000000000000011000000000000000000000",
+        "0000000000000001111000000000000000000000",
+        "0000000000000011111000000000000000000000",
+        "0000000000000011110000000000000000000000",
+        "0000000000000001100000000000000000000000",
+        "0000000000000001000000000000000000000000",
+        "0000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000", // Африка
+        "0000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000"
     )
 
     init {
@@ -54,37 +81,51 @@ class MapView @JvmOverloads constructor(
                 return true
             }
         })
-        loadMapImage()
-    }
-
-    private fun loadMapImage() {
-        try {
-            val resId = resources.getIdentifier("map", "drawable", context.packageName)
-            if (resId != 0) {
-                mapBitmap = BitmapFactory.decodeResource(resources, resId)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        // 1. Заливаем всё океаном
+        canvas.drawColor(Color.parseColor("#1A237E"))
+
         canvas.save()
+        // 2. Применяем зум и смещение
         canvas.scale(scaleFactor, scaleFactor, width / 2f, height / 2f)
         canvas.translate(offsetX, offsetY)
 
-        mapBitmap?.let {
-            canvas.drawBitmap(it, 0f, 0f, null)
+        // Центрируем карту
+        val mapWidth = mapGrid[0].length * pixelSize
+        val mapHeight = mapGrid.size * pixelSize
+        val startX = (width - mapWidth) / 2f
+        val startY = (height - mapHeight) / 2f
+
+        // 3. Рисуем материки
+        for (y in mapGrid.indices) {
+            for (x in mapGrid[y].indices) {
+                if (mapGrid[y][x] == '1') {
+                    val left = startX + x * pixelSize
+                    val top = startY + y * pixelSize
+                    canvas.drawRect(left, top, left + pixelSize, top + pixelSize, landPaint)
+                    
+                    // Рисуем сетку (как на скрине)
+                    canvas.drawRect(left, top, left + pixelSize, top + pixelSize, gridPaint)
+                }
+            }
         }
 
-        val dotRadius = 5f / scaleFactor
-        for (dot in testDots) {
-            val x = dot[0]
-            val y = dot[1]
-            canvas.drawCircle(x, y, dotRadius + 1f, dotOutlinePaint)
-            canvas.drawCircle(x, y, dotRadius, dotPaint)
+        // 4. Рисуем точки (города/провинции) поверх суши
+        for (y in mapGrid.indices) {
+            for (x in mapGrid[y].indices) {
+                if (mapGrid[y][x] == '1') {
+                    val cx = startX + x * pixelSize + pixelSize / 2f
+                    val cy = startY + y * pixelSize + pixelSize / 2f
+                    // Рисуем точку не в каждой клетке, а через одну (для красоты)
+                    if ((x + y) % 2 == 0) {
+                        canvas.drawCircle(cx, cy, 3f / scaleFactor, dotPaint)
+                    }
+                }
+            }
         }
 
         canvas.restore()
@@ -110,11 +151,6 @@ class MapView @JvmOverloads constructor(
                     lastTouchY = event.y
                     isDragging = true
                     invalidate()
-                }
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                if (!isDragging) {
-                    // Здесь будет обработка клика
                 }
             }
         }
