@@ -9,7 +9,6 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
-import android.view.animation.DecelerateInterpolator
 import kotlin.math.abs
 
 class MapView @JvmOverloads constructor(
@@ -48,12 +47,7 @@ class MapView @JvmOverloads constructor(
     // Кисти
     private val waterPaint = Paint().apply { color = Color.parseColor("#1A237E") }
     private val landPaint = Paint().apply { color = Color.parseColor("#D2B48C") }
-    private val gridPaint = Paint().apply {
-        color = Color.parseColor("#000000")
-        style = Paint.Style.STROKE
-        strokeWidth = 1f
-        alpha = 50
-    }
+    // Убрали gridPaint (сетку)
     private val dotPaint = Paint().apply {
         color = Color.WHITE
         style = Paint.Style.FILL
@@ -94,6 +88,7 @@ class MapView @JvmOverloads constructor(
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 scaleFactor *= detector.scaleFactor
                 scaleFactor = scaleFactor.coerceIn(0.5f, 5.0f)
+                targetScale = scaleFactor // Синхронизируем цель
                 invalidate()
                 return true
             }
@@ -113,17 +108,18 @@ class MapView @JvmOverloads constructor(
         val startX = (width - mapWidth) / 2f
         val startY = (height - mapHeight) / 2f
 
+        // Рисуем материки без сетки
         for (y in mapGrid.indices) {
             for (x in mapGrid[y].indices) {
                 if (mapGrid[y][x] == '1') {
                     val left = startX + x * pixelSize
                     val top = startY + y * pixelSize
                     canvas.drawRect(left, top, left + pixelSize, top + pixelSize, landPaint)
-                    canvas.drawRect(left, top, left + pixelSize, top + pixelSize, gridPaint)
                 }
             }
         }
 
+        // Рисуем точки
         for (y in mapGrid.indices) {
             for (x in mapGrid[y].indices) {
                 if (mapGrid[y][x] == '1' && (x + y) % 2 == 0) {
@@ -159,7 +155,7 @@ class MapView @JvmOverloads constructor(
                     offsetY += dy
                     
                     if (dt > 0) {
-                        velocityX = dx / dt * 16f // Перевод в пиксели за кадр
+                        velocityX = dx / dt * 16f
                         velocityY = dy / dt * 16f
                     }
                     
@@ -172,7 +168,6 @@ class MapView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 if (isDragging && !scaleDetector.isInProgress) {
-                    // Запуск инерции
                     if (abs(velocityX) > 0.5f || abs(velocityY) > 0.5f) {
                         isAnimating = true
                         postOnAnimation(object : Runnable {
@@ -180,7 +175,7 @@ class MapView @JvmOverloads constructor(
                                 if (!isAnimating) return
                                 offsetX += velocityX
                                 offsetY += velocityY
-                                velocityX *= 0.92f // Трение (плавное затухание)
+                                velocityX *= 0.92f
                                 velocityY *= 0.92f
                                 
                                 if (abs(velocityX) < 0.1f && abs(velocityY) < 0.1f) {
